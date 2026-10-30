@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { BACKUP_FORMAT_VERSION } from '../config/app';
 import { INITIAL_FOODS } from '../data/foods';
 import { defaultHouseholdPrefs } from '../data/household';
 import { INITIAL_RECIPES } from '../data/recipes';
@@ -229,7 +230,7 @@ describe('壊れたファイルを拒否する', () => {
   });
 
   it('新しい版の形式', () => {
-    const text = serializeBackup(sampleData(), now).replace('"formatVersion": 5', '"formatVersion": 999');
+    const text = serializeBackup(sampleData(), now).replace(`"formatVersion": ${BACKUP_FORMAT_VERSION}`, '"formatVersion": 999');
     const r = parseBackup(text);
     expect(r.ok).toBe(false);
   });

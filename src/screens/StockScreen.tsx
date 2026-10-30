@@ -1,5 +1,5 @@
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ErrorList, Field } from '../components/Field';
 import { FoodPicker } from '../components/FoodPicker';
 import { Sheet } from '../components/Sheet';
@@ -11,8 +11,11 @@ import { formatShortDate, toDateString } from '../logic/date';
 import { parseAmount } from '../logic/forms';
 import { amountToInput, formatAmount, formatStockAmount } from '../logic/format';
 import { isPastShelfLife } from '../logic/stock';
+import { STOCK_SORTS, filterStockRows, parseStockSort, sortStockRows, type StockSort } from '../logic/stockList';
+import { defaultHouseholdPrefs } from '../data/household';
 import { LunchSheet } from './stock/LunchSheet';
 import { PasteSheet } from './stock/PasteSheet';
+import { SwipeRow } from './stock/SwipeRow';
 import { TidyBar } from './stock/TidyBar';
 import { HelpButton } from '../components/HelpButton';
 
@@ -31,17 +34,32 @@ export function StockScreen() {
   /** 在庫の整理中なら、選んだ食材ID。整理していなければ null */
   const [tidy, setTidy] = useState<ReadonlySet<string> | null>(null);
   const [busy, setBusy] = useState(false);
+  const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<StockSort>(() => parseStockSort(readStoredSort()));
+  /** 左にスワイプして「削除」ボタンが出ている食材(1行だけ) */
+  const [swipedId, setSwipedId] = useState<string | null>(null);
+  const household = useLiveQuery(async () => (await db.household.get('household')) ?? defaultHouseholdPrefs(), []);
 
-  if (!foodData || !stocks || !ignoredWords) return <p className="muted">読み込み中…</p>;
+  // 並び順は、次に開いたときも同じにする(この端末の中だけ)
+  useEffect(() => {
+    try {
+      localStorage.setItem(SORT_KEY, sort);
+    } catch {
+      // 保存できなくても困らない
+    }
+  }, [sort]);
+
+  if (!foodData || !stocks || !ignoredWords || !household) return <p className="muted">読み込み中…</p>;
   const { foods, byId } = foodData;
   const stockById = new Map(stocks.map((s) => [s.foodId, s]));
 
   const rows = stocks
     .map((s) => ({ stock: s, food: byId.get(s.foodId) }))
-    .filter((r): r is { stock: Stock; food: Food } => r.food !== undefined)
-    .sort((a, b) => a.food.name.localeCompare(b.food.name, 'ja'))
-    .map((r) => ({ ...r, past: isPastShelfLife(r.stock, r.food, today) }));
-  const pastIds = rows.filter((r) => r.past).map((r) => r.food.id);
+    .filter((r): r is { stock: Stock; food: Food } => r.food !== undefined);
+  /** 保存の目安を過ぎた食材(印を出さない設定でも、「目安を過ぎたものを選ぶ」には使う) */
+  const pastIds = rows.filter((r) => isPastShelfLife(r.stock, r.food, today)).map((r) => r.food.id);
+  const pastSet = new Set(pastIds);
+  const groups = sortStockRows(filterStockRows(rows, query), sort, today);
   /** 選んだ食材のうち、今も在庫にあるもの(整理中に在庫が消えた食材は数えない) */
   const selectedIds = tidy ? rows.filter((r) => tidy.has(r.food.id)).map((r) => r.food.id) : [];
 
@@ -68,6 +86,12 @@ export function StockScreen() {
 
   const close = () => setMode({ type: 'none' });
 
+  /** 左スワイプの「削除」:1品ずつの「在庫から消す」と同じ扱い(在庫の動きの理由は「手直し」) */
+  const removeOne = async (foodId: string) => {
+    setSwipedId(null);
+    await removeStockFromDb(db, foodId, new Date());
+  };
+
   return (
     <>
       <div className="screen-header">
@@ -78,7 +102,7 @@ export function StockScreen() {
         <div className="header-actions">
           {/* 整理中は一覧の上の「やめる」で戻るので、見出しのボタンは出さない */}
           {!tidy && (
-            <button type="button" className="btn btn-text" disabled={rows.length === 0} onClick={() => setTidy(new Set())}>
+            <button type="button" className="btn btn-text" disabled={rows.length === 0} onClick={() => { setSwipedId(null); setTidy(new Set()); }}>
               整理
             </button>
           )}
@@ -108,41 +132,82 @@ export function StockScreen() {
         </div>
       )}
 
+      {rows.length > 0 && (
+        <div className="stock-tools">
+          <input
+            className="input"
+            type="search"
+            placeholder="在庫を探す(例:はくさい)"
+            aria-label="在庫を探す"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <div className="segmented" role="radiogroup" aria-label="並び順">
+            {STOCK_SORTS.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                role="radio"
+                aria-checked={sort === o.id}
+                className={`chip${sort === o.id ? ' is-on' : ''}`}
+                onClick={() => setSort(o.id)}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <div className="empty">在庫がありません。「＋ 追加」から登録してください。</div>
+      ) : groups.length === 0 ? (
+        <div className="empty">「{query.trim()}」は在庫にありません。</div>
       ) : (
-        <ul className="list">
-          {rows.map(({ stock, food, past }) => {
-            const body = (
-              <>
-                <span className="group-dot" data-group={food.foodGroup ?? ''} aria-hidden="true" />
-                <span className="list-main">
-                  <span className="list-title">{food.name}</span>
-                  <div className="list-sub">
-                    追加日 {formatShortDate(stock.addedDate)}
-                    {past && <span className="tag" style={{ marginLeft: 6 }}>⚠ 目安を過ぎています</span>}
-                  </div>
-                </span>
-                <span className="list-end">{formatStockAmount(stock.amount, food)}</span>
-              </>
-            );
-            return (
-              <li key={stock.foodId}>
-                {tidy ? (
-                  // 整理中は、行のどこをタップしても選べる(量の編集は開かない)
-                  <label className="list-item check-row">
-                    <input type="checkbox" checked={tidy.has(food.id)} onChange={() => toggle(food.id)} />
-                    {body}
-                  </label>
-                ) : (
-                  <button type="button" className="list-item" onClick={() => setMode({ type: 'edit', food, stock })}>
-                    {body}
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
+        groups.map((group) => (
+          <div key={group.genre ?? 'all'}>
+            {group.genre && <h2 className="stock-genre">{group.genre}</h2>}
+            <ul className="list">
+              {group.rows.map(({ stock, food }) => {
+                const past = household.showShelfLife && pastSet.has(food.id);
+                const body = (
+                  <>
+                    <span className="group-dot" data-group={food.foodGroup ?? ''} aria-hidden="true" />
+                    <span className="list-main">
+                      <span className="list-title">{food.name}</span>
+                      <div className="list-sub">
+                        追加日 {formatShortDate(stock.addedDate)}
+                        {past && <span className="tag" style={{ marginLeft: 6 }}>⚠ 目安を過ぎています</span>}
+                      </div>
+                    </span>
+                    <span className="list-end">{formatStockAmount(stock.amount, food)}</span>
+                  </>
+                );
+                return (
+                  <li key={stock.foodId}>
+                    {tidy ? (
+                      // 整理中は、行のどこをタップしても選べる(量の編集は開かない)
+                      <label className="list-item check-row">
+                        <input type="checkbox" checked={tidy.has(food.id)} onChange={() => toggle(food.id)} />
+                        {body}
+                      </label>
+                    ) : (
+                      <SwipeRow
+                        open={swipedId === food.id}
+                        onOpenChange={(open) => setSwipedId(open ? food.id : null)}
+                        onTap={() => setMode({ type: 'edit', food, stock })}
+                        onDelete={() => void removeOne(food.id)}
+                        label={food.name}
+                      >
+                        {body}
+                      </SwipeRow>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))
       )}
 
       {mode.type === 'paste' && <PasteSheet foods={foods} byId={byId} ignoredWords={ignoredWords} onClose={close} />}
@@ -208,6 +273,17 @@ export function StockScreen() {
       )}
     </>
   );
+}
+
+const SORT_KEY = 'kondate-stock-sort';
+
+/** 保存しておいた並び順(読めなければ null) */
+function readStoredSort(): string | null {
+  try {
+    return localStorage.getItem(SORT_KEY);
+  } catch {
+    return null;
+  }
 }
 
 interface AmountFormProps {
