@@ -255,6 +255,77 @@ export function refillDay(input: RefillInput): MealSetResult {
   return { ok: true, change: { mealSet, ...ledger.effect() } };
 }
 
+/**
+ * その日に確保した食材を在庫に戻したとしたときの在庫(確定後の再編集で、候補の在庫の見込みに使う。何も保存しない)
+ */
+export function stocksWithDayReturned(set: MealSet, dayIndex: number, stocks: readonly Stock[]): Stock[] {
+  const map = new Map(stocks.map((s) => [s.foodId, { ...s }]));
+  for (const r of set.reserved) {
+    if (r.dayIndex !== dayIndex) continue;
+    const current = map.get(r.foodId);
+    if (current) current.amount = roundAmount(current.amount + r.amount);
+    else map.set(r.foodId, { foodId: r.foodId, amount: r.amount, addedDate: r.addedDate ?? '' });
+  }
+  return [...map.values()];
+}
+
+export interface RebookInput {
+  set: MealSet;
+  dayIndex: number;
+  /** 再編集したあとの1日分(日付とメンバーは今のまま) */
+  day: PlannedDay;
+  data: PlannerData;
+  now: Date;
+  newId: IdGenerator;
+}
+
+/**
+ * 確定した献立の1日分の料理を変える(確定後の再編集):
+ * その日に確保した食材をいったん在庫に戻し(追加日も元どおり)、まだ買っていない買い足しの行を消してから、
+ * 変えたあとの3品で在庫を確保し直し、足りない分を買い足しリストに足す。
+ * すでに「買った」分は在庫に入っているので、そのまま新しい料理に使われる。「作った」の日は変えられない
+ */
+export function rebookDay(input: RebookInput): MealSetResult {
+  const { set, dayIndex, day, data } = input;
+  const current = set.days[dayIndex];
+  if (!current) return { ok: false, error: 'その日の献立が見つかりません' };
+  if (current.status !== '予定') return { ok: false, error: '「予定」の日だけ料理を変えられます' };
+  if (day.date !== current.date) return { ok: false, error: '変える日の日付が違います' };
+
+  const recipesById = new Map(data.recipes.map((r) => [r.id, r]));
+  const ledger = new Ledger(data.stocks, input.now, input.newId, set.id);
+  // 確保した順と逆に戻す
+  for (const r of [...set.reserved].reverse()) {
+    if (r.dayIndex === dayIndex) ledger.change(r.foodId, r.amount, 'キャンセルで戻す', r.addedDate);
+  }
+  const { reserved, shopping } = reserveDay(ledger, day, dayIndex, data, recipesById);
+
+  // 在庫に戻って余った食材で、ほかの日のまだ買っていない不足をまかなう(その分は買い足しリストから減る)
+  const otherReserved: ReservedFood[] = [];
+  const otherShopping = set.shopping.flatMap((s): ShoppingItem[] => {
+    if (s.dayIndex === dayIndex) return s.bought ? [s] : [];
+    if (s.bought) return [s];
+    const r = ledger.take(s.foodId, s.amount, s.dayIndex);
+    if (r) otherReserved.push(r);
+    const rest = roundAmount(s.amount - (r?.amount ?? 0));
+    return rest > 0 ? [{ ...s, amount: rest }] : [];
+  });
+
+  const days = set.days.map((d, i) => (i === dayIndex ? toMealDay(day) : d));
+  const overLimitDays = set.overLimitDays.filter((i) => i !== dayIndex);
+  if (day.overLimit) overLimitDays.push(dayIndex);
+
+  const mealSet: MealSet = {
+    ...set,
+    days,
+    status: setStatus(days),
+    reserved: [...set.reserved.filter((r) => r.dayIndex !== dayIndex), ...reserved, ...otherReserved],
+    shopping: [...otherShopping, ...shopping],
+    overLimitDays: overLimitDays.sort((a, b) => a - b),
+  };
+  return { ok: true, change: { mealSet, ...ledger.effect() } };
+}
+
 /** 買い足しリストの1行(食材ごとにまとめたもの) */
 export interface ShoppingLine {
   foodId: string;

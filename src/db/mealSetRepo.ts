@@ -10,11 +10,13 @@ import {
   confirmPlan,
   markBought,
   markCooked,
+  rebookDay,
   refillDay,
   unmarkCooked,
   type ConfirmInput,
   type MealSetChange,
   type MealSetResult,
+  type RebookInput,
   type RefillInput,
 } from '../logic/mealSet';
 
@@ -96,4 +98,12 @@ export async function refillDayInDb(
     }
     return result;
   });
+}
+
+/** 確定した献立の1日分の料理を変える(確定後の再編集)。在庫は保存する直前に読み直す */
+export async function rebookDayInDb(
+  db: KondateDB,
+  input: Omit<RebookInput, 'set' | 'data'> & { mealSetId: string; data: Omit<RebookInput['data'], 'stocks'> },
+): Promise<MealSetResult> {
+  return update(db, input.mealSetId, (set, stocks) => rebookDay({ ...input, set, data: { ...input.data, stocks } }));
 }

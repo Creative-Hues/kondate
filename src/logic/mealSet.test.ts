@@ -8,7 +8,9 @@ import {
   defaultBoughtAmount,
   markBought,
   markCooked,
+  rebookDay,
   shoppingLines,
+  stocksWithDayReturned,
   type MealSetChange,
   type MealSetResult,
   type StockEffect,
@@ -192,5 +194,105 @@ describe('作った', () => {
     expect(cancel.mealSet.days.map((d) => d.status)).toEqual(['作った', 'キャンセル', 'キャンセル']);
     expect(cancel.mealSet.status).toBe('作った');
     expect(cancel.mealSet.reserved.every((r) => r.dayIndex === 0)).toBe(true);
+  });
+});
+
+describe('確定後の再編集(1日分の料理を変える)', () => {
+  // 副菜を小松菜の料理に、主菜を鶏もも肉の料理に変えられるようにする
+  const editRecipes = [
+    ...recipes,
+    recipe('s2', '副菜', [['komatsuna', 1, true]]),
+    recipe('m2', '主菜', [['chicken_thigh', 200, true]]),
+  ];
+  const stocksWithKomatsuna: Stock[] = [...initialStocks, { foodId: 'komatsuna', amount: 1, addedDate: '2026-09-21' }].sort((a, b) =>
+    a.foodId.localeCompare(b.foodId),
+  );
+  const editData = (stocks: Stock[]) =>
+    plannerData({ recipes: editRecipes, members: [member('a'), member('b')], stocks, pantryIds: ['soy_sauce', 'miso'] });
+  const changed = (set: MealSetChange['mealSet'], dayIndex: number, patch: Partial<PlannedDay>): PlannedDay => {
+    const d = set.days[dayIndex];
+    return { date: d.date, memberIds: d.memberIds, mainId: d.mainId, sideId: d.sideId, soupId: d.soupId, overLimit: false, ...patch };
+  };
+
+  it('1日目の副菜を変えると、前の副菜の食材が在庫に戻り、新しい副菜の分が減る。前の副菜だけの買い足しは消える', () => {
+    const c = confirm(stocksWithKomatsuna);
+    const stocks = apply(stocksWithKomatsuna, c);
+    expect(stocks.find((s) => s.foodId === 'spinach')).toBeUndefined();
+    const r = ok(rebookDay({ set: c.mealSet, dayIndex: 0, day: changed(c.mealSet, 0, { sideId: 's2' }), data: editData(stocks), now, newId: sequentialIds('e') }));
+    const after = apply(stocks, r);
+    expect(r.mealSet.days[0].sideId).toBe('s2');
+    expect(r.mealSet.days[0].status).toBe('予定');
+    // 小松菜1束を使い切る
+    expect(after.find((s) => s.foodId === 'komatsuna')).toBeUndefined();
+    // 戻ったほうれん草1束は、2日目の足りない分に使われ、2日目の買い足しから消える
+    expect(r.mealSet.shopping.some((s) => s.foodId === 'spinach' && s.dayIndex === 1)).toBe(false);
+    expect(r.mealSet.reserved.some((x) => x.foodId === 'spinach' && x.dayIndex === 1)).toBe(true);
+    // 前の副菜のみりん(1日目)の買い足しは消える。2・3日目の分は残る
+    expect(r.mealSet.shopping.filter((s) => s.foodId === 'mirin').map((s) => s.dayIndex)).toEqual([1, 2]);
+  });
+
+  it('再編集したあとでセット全体をキャンセルすると、確定前とまったく同じ在庫に戻る', () => {
+    const c = confirm(stocksWithKomatsuna);
+    let stocks = apply(stocksWithKomatsuna, c);
+    const r = ok(rebookDay({ set: c.mealSet, dayIndex: 0, day: changed(c.mealSet, 0, { sideId: 's2' }), data: editData(stocks), now, newId: sequentialIds('e') }));
+    stocks = apply(stocks, r);
+    const cancel = ok(cancelSet(r.mealSet, stocks, now, sequentialIds('c')));
+    expect(apply(stocks, cancel)).toEqual(stocksWithKomatsuna);
+  });
+
+  it('「買った」分は在庫に残る:買い足しの「買った」の行は消えず、キャンセルすると確定前+買った分になる', () => {
+    const c = confirm(stocksWithKomatsuna);
+    let stocks = apply(stocksWithKomatsuna, c);
+    const bought = ok(markBought(c.mealSet, 'pork_koma', 400, stocks, now, sequentialIds('b')));
+    stocks = apply(stocks, bought);
+    // 3日目の主菜を鶏もも肉に変える → 3日目に確保した豚こま200gが在庫に戻る
+    const r = ok(rebookDay({ set: bought.mealSet, dayIndex: 2, day: changed(bought.mealSet, 2, { mainId: 'm2' }), data: editData(stocks), now, newId: sequentialIds('e') }));
+    const after = apply(stocks, r);
+    expect(after.find((s) => s.foodId === 'pork_koma')?.amount).toBe(250);
+    expect(r.mealSet.shopping.find((s) => s.foodId === 'pork_koma' && s.dayIndex === 2)?.bought).toBe(true);
+    expect(r.mealSet.shopping.find((s) => s.foodId === 'chicken_thigh' && s.dayIndex === 2)).toEqual({ dayIndex: 2, foodId: 'chicken_thigh', amount: 200, bought: false });
+    const cancel = ok(cancelSet(r.mealSet, after, now, sequentialIds('c')));
+    const expected = stocksWithKomatsuna.map((s) => (s.foodId === 'pork_koma' ? { ...s, amount: 650 } : s));
+    expect(apply(after, cancel)).toEqual(expected);
+  });
+
+  it('「作った」の日とキャンセルした日は変えられない。日付が違えばエラー', () => {
+    const c = confirm(stocksWithKomatsuna);
+    const stocks = apply(stocksWithKomatsuna, c);
+    const cooked = ok(markCooked(c.mealSet, 0)).mealSet;
+    expect(rebookDay({ set: cooked, dayIndex: 0, day: changed(cooked, 0, { sideId: 's2' }), data: editData(stocks), now, newId: sequentialIds() }).ok).toBe(false);
+    const cancelled = ok(cancelDay(c.mealSet, 1, stocks, now, sequentialIds('c'))).mealSet;
+    expect(rebookDay({ set: cancelled, dayIndex: 1, day: changed(cancelled, 1, { sideId: 's2' }), data: editData(stocks), now, newId: sequentialIds() }).ok).toBe(false);
+    expect(rebookDay({ set: c.mealSet, dayIndex: 0, day: changed(c.mealSet, 0, { date: '2026-10-01' }), data: editData(stocks), now, newId: sequentialIds() }).ok).toBe(false);
+  });
+
+  it('候補選び用:その日に確保した食材を在庫に戻したとしたときの在庫(何も保存しない)', () => {
+    const c = confirm(stocksWithKomatsuna);
+    const stocks = apply(stocksWithKomatsuna, c);
+    const returned = stocksWithDayReturned(c.mealSet, 0, stocks);
+    // 1日目に確保した豚こま200g・ほうれん草1束が戻る
+    expect(returned.find((s) => s.foodId === 'pork_koma')).toEqual({ foodId: 'pork_koma', amount: 200, addedDate: '2026-09-24' });
+    expect(returned.find((s) => s.foodId === 'spinach')?.amount).toBe(1);
+  });
+});
+
+describe('確定後の再編集の候補選び(1日分の条件)', () => {
+  it('入れ替えの候補は、同じ日のほかの品と主な材料がかぶらず、ほかの日の料理も選ばない', async () => {
+    const { editDayRequest, editPlannerData, plannedDayOf, canEditDay } = await import('./planner/edit');
+    const { swapDish } = await import('./planner/swap');
+    const editRecipes = [
+      ...recipes,
+      recipe('s_pork', '副菜', [['pork_koma', 50, true]]),
+      recipe('s2', '副菜', [['komatsuna', 1, true]]),
+    ];
+    const c = confirm();
+    const stocks = apply(initialStocks, c);
+    const data = plannerData({ recipes: editRecipes, members: [member('a'), member('b')], stocks, pantryIds: ['soy_sauce', 'miso'] });
+    // 2日目と3日目は、1日目と別の副菜にしておく(同じセットの中で同じレシピは選ばない)
+    const set = { ...c.mealSet, days: c.mealSet.days.map((d, i) => (i === 0 ? d : { ...d, sideId: 's2' })) };
+    expect(canEditDay(set, 0)).toBe(true);
+    const r = swapDish(editDayRequest(set, 0), editPlannerData(set, 0, data), [plannedDayOf(set, 0)], 0, 'sideId', []);
+    // s_pork は主菜と豚こまがかぶり、s2 はほかの日で使っているので、候補がない
+    expect(r.ok).toBe(false);
   });
 });
