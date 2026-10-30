@@ -7,7 +7,7 @@ on:
     branches-ignore: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   check:
@@ -23,9 +23,12 @@ jobs:
       # テストが失敗しても、型の間違いも一度に見られるようにビルドも動かす
       - run: npm run build
         if: ${{ !cancelled() }}
-      # 画面の確認用に、ビルドしたものを取っておく
-      - uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
-          retention-days: 3
+      # 画面の確認用に、ビルドしたものを別のブランチ(preview-ブランチ名)に置く(確認が終わったら消す)
+      - name: ビルドしたものを確認用のブランチに置く
+        run: |
+          cd dist
+          git init -q
+          git checkout -q -b preview
+          git add -A
+          git -c user.name=ci -c user.email=ci@example.invalid commit -qm "確認用のビルド"
+          git push -fq "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}" preview:preview-${{ github.ref_name }}
