@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import Dexie from 'dexie';
 import { afterEach, describe, expect, it } from 'vitest';
 import { INITIAL_FOODS } from '../data/foods';
+import { defaultHouseholdPrefs } from '../data/household';
 import { INITIAL_RECIPES } from '../data/recipes';
 import { parseBackup, serializeBackup } from '../logic/backup';
 import { sequentialIds } from '../logic/id';
@@ -202,6 +203,42 @@ describe('版5からの移行', () => {
     expect(await db.foods.get('user_1')).toMatchObject({ gramsPerUnit: null, altUnits: [] });
     expect(await db.foods.get('dried_shiitake')).toMatchObject({ name: '干ししいたけ', gramsPerUnit: 3 });
     expect(await db.foods.count()).toBe(INITIAL_FOODS.length + 1);
+  });
+});
+
+describe('版6からの移行', () => {
+  it('食材にジャンルを足し(自分で足した食材は種類から)、家庭の好みに保存の目安の表示と文字の大きさを足す。ほかのデータはそのまま', async () => {
+    const name = `test-${++n}`;
+    const old = new Dexie(name);
+    old.version(6).stores({
+      foods: 'id, name, kind',
+      stocks: 'foodId',
+      pantry: 'foodId',
+      members: 'id, kind',
+      household: 'id',
+      recipes: 'id, course, source',
+      mealSets: 'id, startDate',
+      stockMoves: 'id, at, foodId',
+      feedbacks: 'id, at',
+      planDrafts: 'id',
+      ignoredWords: 'word',
+    });
+    await old.table('foods').bulkAdd(INITIAL_FOODS.map(({ genre: _genre, ...f }) => f));
+    await old.table('foods').add({ id: 'user_1', name: 'みょうが', aliases: [], unit: '個', usualAmount: 3, kind: '食材', foodGroup: '緑', shelfLifeDays: 5, isCondiment: true, allergens: [], allergenUncertain: false, gramsPerUnit: null, altUnits: [] });
+    await old.table('foods').add({ id: 'user_2', name: 'ナンプラー', aliases: [], unit: '小さじ', usualAmount: 20, kind: '調味料', foodGroup: null, shelfLifeDays: 365, isCondiment: false, allergens: [], allergenUncertain: false, gramsPerUnit: null, altUnits: [] });
+    const { showShelfLife: _s, fontSize: _f, ...v6Household } = defaultHouseholdPrefs();
+    await old.table('household').add({ ...v6Household, shoppingLimitPerMeal: 3 });
+    await old.table('stocks').add({ foodId: 'egg', amount: 6, addedDate: '2026-09-20' });
+    old.close();
+
+    const db = new KondateDB(name);
+    opened.push(db);
+    expect((await db.foods.get('cabbage'))?.genre).toBe('葉物野菜');
+    expect((await db.foods.get('mirin'))?.genre).toBe('調味料');
+    expect((await db.foods.get('user_1'))?.genre).toBe('その他');
+    expect((await db.foods.get('user_2'))?.genre).toBe('調味料');
+    expect(await db.household.get('household')).toMatchObject({ shoppingLimitPerMeal: 3, showShelfLife: true, fontSize: '中' });
+    expect(await db.stocks.get('egg')).toEqual({ foodId: 'egg', amount: 6, addedDate: '2026-09-20' });
   });
 });
 

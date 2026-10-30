@@ -50,6 +50,7 @@ describe('食材辞書への追加', () => {
     allergenUncertain: false,
     gramsPerUnit: '',
     altUnits: [],
+    genre: 'その他の野菜',
   };
 
   it('正しく入れると食材になる', () => {
@@ -70,6 +71,7 @@ describe('食材辞書への追加', () => {
         allergenUncertain: false,
         gramsPerUnit: null,
         altUnits: [],
+        genre: 'その他の野菜',
       },
     });
   });

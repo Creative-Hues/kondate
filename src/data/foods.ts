@@ -1,6 +1,7 @@
 // 食材辞書の初期データ(開発時に新しく作ったもの)
 // アレルギー物質は「一般的に含まれることが多いもの」を入れている。実際の商品は原材料表示で確かめる
 import type { Allergen } from './allergens';
+import { seedGenre } from './genres';
 import type { AltUnit, Food, FoodGroup } from '../db/types';
 
 /** 食材を作る */
@@ -15,7 +16,7 @@ function food(
   allergens: Allergen[] = [],
   isCondiment = false,
 ): Food {
-  return { id, name, aliases, unit, usualAmount, kind: '食材', foodGroup, shelfLifeDays, isCondiment, allergens, allergenUncertain: false, gramsPerUnit: null, altUnits: [] };
+  return { id, name, aliases, unit, usualAmount, kind: '食材', foodGroup, shelfLifeDays, isCondiment, allergens, allergenUncertain: false, gramsPerUnit: null, altUnits: [], genre: 'その他' };
 }
 
 /** 調味料を作る(食品グループなし) */
@@ -28,7 +29,7 @@ function seasoning(
   shelfLifeDays = 365,
   allergens: Allergen[] = [],
 ): Food {
-  return { id, name, aliases, unit, usualAmount, kind: '調味料', foodGroup: null, shelfLifeDays, isCondiment: false, allergens, allergenUncertain: false, gramsPerUnit: null, altUnits: [] };
+  return { id, name, aliases, unit, usualAmount, kind: '調味料', foodGroup: null, shelfLifeDays, isCondiment: false, allergens, allergenUncertain: false, gramsPerUnit: null, altUnits: [], genre: '調味料' };
 }
 
 const FOOD_LIST: Food[] = [
@@ -272,4 +273,5 @@ export const INITIAL_FOODS: Food[] = FOOD_LIST.map((f) => ({
   allergenUncertain: ALLERGEN_UNCERTAIN_IDS.has(f.id),
   gramsPerUnit: GRAMS_PER_UNIT[f.id] ?? null,
   altUnits: (ALT_UNITS[f.id] ?? []).map((a) => ({ ...a })),
+  genre: seedGenre(f.id, f.kind),
 }));

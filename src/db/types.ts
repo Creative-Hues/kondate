@@ -1,5 +1,6 @@
 // データの型。SPEC.md 3章に対応する
 import type { Allergen } from '../data/allergens';
+import type { Genre } from '../data/genres';
 import type { CookingMethod, Flavor } from '../data/tags';
 
 /** 日付(YYYY-MM-DD) */
@@ -44,6 +45,8 @@ export interface Food {
    * URL の取り込み・昼食の口頭入力・レシートの読み取りで、辞書の単位に換算するのに使う
    */
   altUnits: AltUnit[];
+  /** ジャンル(肉・葉物野菜など)。在庫の一覧をジャンルごとに並べるのに使う */
+  genre: Genre;
 }
 
 /** ほかの数え方1つ:1{unit} = amount(辞書の単位での量) */
@@ -93,6 +96,9 @@ export interface Member {
 
 export type Frequency = '好き' | 'ふつう' | '苦手';
 
+/** 文字の大きさ */
+export type FontSize = '小' | '中' | '大';
+
 /** 家庭全体の好み。1行だけ持つ */
 export interface HouseholdPrefs {
   id: 'household';
@@ -100,6 +106,10 @@ export interface HouseholdPrefs {
   dislikedFlavors: Flavor[];
   /** 1食あたりの買い足し品数の上限 */
   shoppingLimitPerMeal: number;
+  /** 在庫の一覧に「保存の目安を過ぎています」の印を出すか */
+  showShelfLife: boolean;
+  /** 文字の大きさ */
+  fontSize: FontSize;
 }
 
 export type Course = '主菜' | '副菜' | '汁物';

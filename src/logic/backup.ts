@@ -1,6 +1,7 @@
 // 全データの書き出し・読み込み(純粋関数)
 import { BACKUP_FORMAT_VERSION } from '../config/app';
 import { ALLERGENS } from '../data/allergens';
+import { GENRES } from '../data/genres';
 import { COOKING_METHODS, FLAVORS, type CookingMethod } from '../data/tags';
 import {
   TABLE_NAMES,
@@ -22,7 +23,7 @@ import {
 } from '../db/types';
 import { toDateTimeString } from './date';
 import { parseComboValue } from './feedback/target';
-import { upgradeBackupDataV1, upgradeBackupDataV2, upgradeBackupDataV3, upgradeBackupDataV4 } from './migrate';
+import { upgradeBackupDataV1, upgradeBackupDataV2, upgradeBackupDataV3, upgradeBackupDataV4, upgradeBackupDataV5 } from './migrate';
 import {
   ValidationError,
   arr,
@@ -95,6 +96,8 @@ export function parseBackup(text: string): ParseResult {
     if (version < 4) upgradeBackupDataV3(d);
     // 版4までのファイルの食材には、ほかの数え方がない(重さの目安と干ししいたけも足す)
     if (version < 5) upgradeBackupDataV4(d);
+    // 版5までのファイルには、食材のジャンルと、家庭の好みの表示の設定(保存の目安・文字の大きさ)がない
+    if (version < 6) upgradeBackupDataV5(d);
     const data: AllData = {
       foods: arr(d, 'foods', 'data').map((v, i) => parseFood(v, `食材辞書[${i}]`)),
       stocks: arr(d, 'stocks', 'data').map((v, i) => parseStock(v, `在庫[${i}]`)),
@@ -140,6 +143,7 @@ function parseFood(v: unknown, p: string): Food {
     allergenUncertain: bool(o, 'allergenUncertain', p),
     gramsPerUnit: numOrNull(o, 'gramsPerUnit', p),
     altUnits: arr(o, 'altUnits', p).map((a, i) => parseAltUnit(a, `${p}.altUnits[${i}]`)),
+    genre: oneOf(o, 'genre', GENRES, p),
   };
 }
 
@@ -191,6 +195,8 @@ function parseHousehold(v: unknown, p: string): HouseholdPrefs {
     methodFrequency,
     dislikedFlavors: oneOfArr(o, 'dislikedFlavors', FLAVORS, p),
     shoppingLimitPerMeal: num(o, 'shoppingLimitPerMeal', p),
+    showShelfLife: bool(o, 'showShelfLife', p),
+    fontSize: oneOf(o, 'fontSize', ['小', '中', '大'] as const, p),
   };
 }
 

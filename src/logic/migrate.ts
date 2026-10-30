@@ -3,6 +3,7 @@
 // どれも「足りない項目だけを補う」ので、何度呼んでも結果は同じ
 import { DEFAULT_SHOPPING_LIMIT_PER_MEAL, TIME_PRESETS } from '../config/scoring';
 import { INITIAL_FOODS } from '../data/foods';
+import { defaultGenre } from '../data/genres';
 import { INITIAL_RECIPES } from '../data/recipes';
 import type { Obj } from './validate';
 
@@ -109,6 +110,27 @@ export function upgradeBackupDataV4(data: Obj): void {
     const ids = new Set(data.foods.filter(isObj).map((o) => String(o.id)));
     data.foods.push(...missingSeeds(ids, new Set()).foods);
   }
+}
+
+/**
+ * 食材:ジャンルを足す。初期食材は初期データのジャンル、自分で足した食材は種類から決める(調味料は「調味料」、それ以外は「その他」)
+ */
+export function upgradeFoodV6(o: Obj): void {
+  if (o.genre !== undefined) return;
+  const seed = typeof o.id === 'string' ? seedFoods.get(o.id) : undefined;
+  o.genre = seed?.genre ?? defaultGenre(o.kind === '調味料' ? '調味料' : '食材');
+}
+
+/** 家庭の好み:保存の目安の表示(初期値は表示する)と、文字の大きさ(初期値は中)を足す */
+export function upgradeHouseholdV6(o: Obj): void {
+  if (o.showShelfLife === undefined) o.showShelfLife = true;
+  if (o.fontSize === undefined) o.fontSize = '中';
+}
+
+/** 版5の書き出しファイルの data を、版6の形に直す(食材のジャンル、家庭の好みの表示の設定を足す) */
+export function upgradeBackupDataV5(data: Obj): void {
+  if (Array.isArray(data.foods)) for (const f of data.foods) if (isObj(f)) upgradeFoodV6(f);
+  if (Array.isArray(data.household)) for (const h of data.household) if (isObj(h)) upgradeHouseholdV6(h);
 }
 
 /**

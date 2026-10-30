@@ -1,0 +1,29 @@
+# main 以外のブランチに push されたら、テストとビルドだけを行う(公開はしない)
+# 本番(main)に入れる前に、作業用のブランチで確かめるため
+name: テストとビルド(作業用ブランチ)
+
+on:
+  push:
+    branches-ignore: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+      - run: npm run build
+      # 画面の確認用に、ビルドしたものを取っておく
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+          retention-days: 3

@@ -1,5 +1,6 @@
 // 入力フォームの内容を確かめて、保存する形にする(純粋関数)
 import type { Allergen } from '../data/allergens';
+import type { Genre } from '../data/genres';
 import type { CookingMethod, Flavor } from '../data/tags';
 import type {
   AltUnit,
@@ -59,6 +60,8 @@ export interface FoodDraft {
   gramsPerUnit: string;
   /** ほかの数え方(1{unit} = amount 辞書の単位)。単位と量が両方空の行は無視する */
   altUnits: { unit: string; amount: string }[];
+  /** ジャンル(在庫の一覧の見出し) */
+  genre: Genre;
 }
 
 /** 辞書の食材を編集用の下書きにする */
@@ -76,6 +79,7 @@ export function foodToDraft(food: Food): FoodDraft {
     allergenUncertain: food.allergenUncertain,
     gramsPerUnit: food.gramsPerUnit === null ? '' : String(food.gramsPerUnit),
     altUnits: food.altUnits.map((a) => ({ unit: a.unit, amount: String(a.amount) })),
+    genre: food.genre,
   };
 }
 
@@ -134,6 +138,7 @@ export function validateFoodDraft(draft: FoodDraft, existing: readonly Food[], i
       // 単位が g なら換算しないので持たない
       gramsPerUnit: unit === 'g' ? null : gramsPerUnit,
       altUnits,
+      genre: draft.genre,
     },
   };
 }

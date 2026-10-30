@@ -8,7 +8,9 @@ import {
   upgradeFoodV1,
   upgradeFoodV4,
   upgradeFoodV5,
+  upgradeFoodV6,
   upgradeHouseholdV1,
+  upgradeHouseholdV6,
   upgradeMealSetV1,
   upgradeMemberV1,
   upgradeRecipeV1,
@@ -92,6 +94,12 @@ export class KondateDB extends Dexie {
       await tx.table('foods').toCollection().modify((o: Obj) => upgradeFoodV5(o));
       const foodIds = new Set((await tx.table('foods').toCollection().primaryKeys()).map(String));
       await tx.table('foods').bulkAdd(missingSeeds(foodIds, new Set()).foods);
+    });
+
+    // 版7:食材にジャンルを足し、家庭の好みに保存の目安の表示と文字の大きさを足す(すでに入っている値は変えない)
+    this.version(7).upgrade(async (tx) => {
+      await tx.table('foods').toCollection().modify((o: Obj) => upgradeFoodV6(o));
+      await tx.table('household').toCollection().modify((o: Obj) => upgradeHouseholdV6(o));
     });
 
     // データベースを初めて作ったときだけ、初期データを入れる

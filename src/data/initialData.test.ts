@@ -5,6 +5,7 @@ import { INITIAL_FOODS } from './foods';
 import { INITIAL_RECIPES } from './recipes';
 import { canBeMain } from '../logic/planner/mainFoods';
 import { ALLERGENS } from './allergens';
+import { GENRES, GENRE_BY_FOOD } from './genres';
 import { COOKING_METHODS, FLAVORS } from './tags';
 
 const foodIds = new Set(INITIAL_FOODS.map((f) => f.id));
@@ -37,6 +38,22 @@ describe('食材辞書の初期データ', () => {
       for (const a of f.allergens) expect(ALLERGENS, f.id).toContain(a);
       expect(new Set(f.allergens).size, f.id).toBe(f.allergens.length);
     }
+  });
+
+  it('ジャンル:食材はすべて表で決めてあり(「その他」にならない)、調味料はすべて「調味料」', () => {
+    for (const f of INITIAL_FOODS) {
+      expect(GENRES, f.id).toContain(f.genre);
+      if (f.kind === '調味料') expect(f.genre, f.id).toBe('調味料');
+      else {
+        expect(GENRE_BY_FOOD.has(f.id), f.id).toBe(true);
+        expect(f.genre, f.id).not.toBe('その他');
+      }
+    }
+    // 表に書いた食材IDが、すべて初期食材にある(書き間違いがない)
+    const ids = new Set(INITIAL_FOODS.map((f) => f.id));
+    for (const id of GENRE_BY_FOOD.keys()) expect(ids.has(id), id).toBe(true);
+    expect(INITIAL_FOODS.find((f) => f.id === 'cabbage')?.genre).toBe('葉物野菜');
+    expect(INITIAL_FOODS.find((f) => f.id === 'chinese_cabbage')?.genre).toBe('葉物野菜');
   });
 
   it('要確認の印は顆粒だし・サラダ油・ケチャップ・キムチ', () => {

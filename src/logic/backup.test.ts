@@ -147,7 +147,7 @@ describe('版1のファイルの読み込み', () => {
     const data = sampleData();
     data.foods = [
       ...INITIAL_FOODS,
-      { id: 'user_1', name: 'みょうが', aliases: [], unit: '個', usualAmount: 3, kind: '食材', foodGroup: '緑', shelfLifeDays: 5, isCondiment: true, allergens: ['大豆'], allergenUncertain: true, gramsPerUnit: 40, altUnits: [] },
+      { id: 'user_1', name: 'みょうが', aliases: [], unit: '個', usualAmount: 3, kind: '食材', foodGroup: '緑', shelfLifeDays: 5, isCondiment: true, allergens: ['大豆'], allergenUncertain: true, gramsPerUnit: 40, altUnits: [], genre: 'その他' },
     ];
     data.recipes = [
       ...INITIAL_RECIPES,
@@ -189,7 +189,7 @@ describe('版4のファイルの読み込み', () => {
     const data = sampleData();
     data.foods = [
       ...INITIAL_FOODS.filter((f) => f.id !== 'dried_shiitake'),
-      { id: 'user_1', name: 'みょうが', aliases: [], unit: '個', usualAmount: 3, kind: '食材', foodGroup: '緑', shelfLifeDays: 5, isCondiment: true, allergens: [], allergenUncertain: false, gramsPerUnit: null, altUnits: [] },
+      { id: 'user_1', name: 'みょうが', aliases: [], unit: '個', usualAmount: 3, kind: '食材', foodGroup: '緑', shelfLifeDays: 5, isCondiment: true, allergens: [], allergenUncertain: false, gramsPerUnit: null, altUnits: [], genre: 'その他' },
     ];
     const raw = JSON.parse(serializeBackup(data, now));
     raw.formatVersion = 4;
@@ -261,5 +261,40 @@ describe('壊れたファイルを拒否する', () => {
     const raw = JSON.parse(serializeBackup(sampleData(), now));
     delete raw.data.stocks;
     expect(parseBackup(JSON.stringify(raw)).ok).toBe(false);
+  });
+});
+
+describe('版5のファイルの読み込み', () => {
+  it('食材のジャンルがなくても、初期食材は初期データのジャンル、自分で足した食材は種類から決めて読み込める', () => {
+    const data = sampleData();
+    data.foods = [
+      ...INITIAL_FOODS,
+      { id: 'user_1', name: 'みょうが', aliases: [], unit: '個', usualAmount: 3, kind: '食材', foodGroup: '緑', shelfLifeDays: 5, isCondiment: true, allergens: [], allergenUncertain: false, gramsPerUnit: null, altUnits: [], genre: 'その他' },
+      { id: 'user_2', name: 'ナンプラー', aliases: [], unit: '小さじ', usualAmount: 20, kind: '調味料', foodGroup: null, shelfLifeDays: 365, isCondiment: false, allergens: [], allergenUncertain: false, gramsPerUnit: null, altUnits: [], genre: '調味料' },
+    ];
+    const raw = JSON.parse(serializeBackup(data, now));
+    raw.formatVersion = 5;
+    for (const f of raw.data.foods) delete f.genre;
+    for (const h of raw.data.household) {
+      delete h.showShelfLife;
+      delete h.fontSize;
+    }
+    const r = parseBackup(JSON.stringify(raw));
+    if (!r.ok) throw new Error(r.error);
+    const by = (id: string) => r.data.foods.find((f) => f.id === id);
+    expect(by('cabbage')?.genre).toBe('葉物野菜');
+    expect(by('pork_koma')?.genre).toBe('肉');
+    expect(by('soy_sauce')?.genre).toBe('調味料');
+    expect(by('user_1')?.genre).toBe('その他');
+    expect(by('user_2')?.genre).toBe('調味料');
+    expect(r.data.household[0]).toMatchObject({ showShelfLife: true, fontSize: '中' });
+  });
+
+  it('今の版のファイルで、ジャンルが決まった値以外なら拒否する', () => {
+    const raw = JSON.parse(serializeBackup(sampleData(), now));
+    raw.data.foods[0].genre = 'お肉';
+    const r = parseBackup(JSON.stringify(raw));
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.error).toContain('食材辞書[0].genre');
   });
 });

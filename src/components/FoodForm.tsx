@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ALLERGENS } from '../data/allergens';
+import { GENRES, defaultGenre, type Genre } from '../data/genres';
 import { db } from '../db/db';
 import type { Food, FoodGroup, FoodKind } from '../db/types';
 import { foodToDraft, validateFoodDraft, type FoodDraft } from '../logic/forms';
@@ -34,6 +35,7 @@ function emptyDraft(name: string): FoodDraft {
     allergenUncertain: false,
     gramsPerUnit: '',
     altUnits: [],
+    genre: 'その他',
   };
 }
 
@@ -123,9 +125,22 @@ export function FoodForm({ food = null, initialName = '', foods, onSaved, onCanc
         </Field>
       ) : (
         <Field label="区分">
-          <SingleChoice<FoodKind> options={['食材', '調味料']} value={draft.kind} onChange={(v) => set('kind', v)} />
+          <SingleChoice<FoodKind>
+            options={['食材', '調味料']}
+            value={draft.kind}
+            onChange={(v) => setDraft((d) => ({ ...d, kind: v, genre: defaultGenre(v) }))}
+          />
         </Field>
       )}
+      <Field label="ジャンル" hint="在庫の一覧を「ジャンル順」にしたときの見出しです">
+        <select className="input" value={draft.genre} onChange={(e) => set('genre', e.target.value as Genre)}>
+          {GENRES.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+      </Field>
       {draft.kind === '食材' && (
         <Field label="食品グループ" hint={GROUP_HINT}>
           <SingleChoice<FoodGroup>
