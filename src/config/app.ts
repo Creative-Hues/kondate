@@ -9,3 +9,7 @@ export const BASE_PATH = '/kondate/';
 
 // 書き出しファイルの形式バージョン。データの形を変えたら上げる
 export const BACKUP_FORMAT_VERSION = 6;
+
+// 文字の大きさの設定(小・中・大)ごとの、もとになる文字の大きさ(px)。画面の文字はすべてこれに合わせて大きさが変わる
+// 拡大の操作を止めているので、そのかわりに設定画面で選べるようにしている
+export const FONT_SIZE_PX = { 小: 14, 中: 16, 大: 19 } as const;

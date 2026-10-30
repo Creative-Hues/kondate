@@ -31,6 +31,9 @@ import type {
   StockMove,
 } from './types';
 
+/** データベースのいちばん新しい版。版を足したらここも上げる(更新の前のバックアップで、版が上がるかを調べるのに使う) */
+export const CURRENT_DB_VERSION = 7;
+
 export class KondateDB extends Dexie {
   foods!: EntityTable<Food, 'id'>;
   stocks!: EntityTable<Stock, 'foodId'>;

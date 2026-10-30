@@ -14,7 +14,8 @@ export default defineConfig({
         html.replaceAll('%APP_SHORT_NAME%', APP_SHORT_NAME).replaceAll('%APP_NAME%', APP_NAME),
     },
     VitePWA({
-      registerType: 'autoUpdate',
+      // 新しい版が届いても自動では切り替えず、お知らせを出す(書き出しを済ませてから更新する。UpdatePrompt.tsx)
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: APP_NAME,

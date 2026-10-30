@@ -60,6 +60,25 @@ export function serializeBackup(data: AllData, now: Date): string {
   return JSON.stringify(file, null, 2);
 }
 
+/**
+ * データベースの版(Dexie の版)ごとの、書き出しファイルの形式バージョン。
+ * 更新の前に、古い形のままのデータを書き出すときに使う(読み込むときに、今の形に直される)
+ */
+const FORMAT_VERSION_FOR_DB: Readonly<Record<number, number>> = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6 };
+
+export function formatVersionForDb(dbVersion: number): number | null {
+  return FORMAT_VERSION_FOR_DB[dbVersion] ?? null;
+}
+
+/**
+ * 古い版のデータベースから、形を確かめずにそのまま読んだデータを JSON の文字列にする(更新の前のバックアップ用)。
+ * ない表は空にする。形式バージョンはデータベースの版から決める
+ */
+export function serializeRawBackup(tables: Readonly<Record<string, unknown[]>>, formatVersion: number, now: Date): string {
+  const data = Object.fromEntries(TABLE_NAMES.map((t) => [t, tables[t] ?? []]));
+  return JSON.stringify({ app: APP_ID, formatVersion, exportedAt: toDateTimeString(now), data }, null, 2);
+}
+
 /** 書き出すファイルの名前 */
 export function backupFileName(now: Date): string {
   const pad = (n: number) => String(n).padStart(2, '0');

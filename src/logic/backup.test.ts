@@ -4,7 +4,7 @@ import { INITIAL_FOODS } from '../data/foods';
 import { defaultHouseholdPrefs } from '../data/household';
 import { INITIAL_RECIPES } from '../data/recipes';
 import type { AllData } from '../db/types';
-import { backupFileName, countData, parseBackup, serializeBackup } from './backup';
+import { backupFileName, countData, formatVersionForDb, parseBackup, serializeBackup, serializeRawBackup } from './backup';
 
 const now = new Date(2026, 8, 25, 21, 5, 0);
 
@@ -297,5 +297,34 @@ describe('版5のファイルの読み込み', () => {
     const r = parseBackup(JSON.stringify(raw));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.error).toContain('食材辞書[0].genre');
+  });
+});
+
+describe('更新の前のバックアップ(古い版のデータベースをそのまま書き出す)', () => {
+  it('版6のデータベースの中身を書き出すと、形式バージョン5のファイルになり、今の形に直して読み込める', () => {
+    const data = sampleData();
+    const v6Foods = data.foods.map(({ genre: _genre, ...f }) => f);
+    const { showShelfLife: _s, fontSize: _f, ...v6Household } = defaultHouseholdPrefs();
+    const tables: Record<string, unknown[]> = { ...data, foods: v6Foods, household: [v6Household] };
+    const format = formatVersionForDb(6);
+    expect(format).toBe(5);
+    const r = parseBackup(serializeRawBackup(tables, format ?? 0, now));
+    if (!r.ok) throw new Error(r.error);
+    expect(r.data.foods.find((f) => f.id === 'cabbage')?.genre).toBe('葉物野菜');
+    expect(r.data.household[0]).toMatchObject({ showShelfLife: true, fontSize: '中' });
+    expect(r.data.stocks).toEqual(data.stocks);
+    expect(r.data.mealSets).toEqual(data.mealSets);
+  });
+
+  it('ない表は空にする(版3のデータベースには読まない言葉の表がない)', () => {
+    const text = serializeRawBackup({ foods: [] }, 2, now);
+    const raw = JSON.parse(text);
+    expect(raw.data.ignoredWords).toEqual([]);
+    expect(raw.formatVersion).toBe(2);
+  });
+
+  it('今の版のデータベースの形式バージョンは、今の書き出しの形式バージョン', () => {
+    expect(formatVersionForDb(7)).toBe(BACKUP_FORMAT_VERSION);
+    expect(formatVersionForDb(99)).toBeNull();
   });
 });

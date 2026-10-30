@@ -41,6 +41,19 @@
 
 * {
   box-sizing: border-box;
+  /* ブラウザのスクロールバーは出さない(スクロールはできる) */
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
+}
+
+/* 文字の大きさの設定(小・中・大)は、ここの値を変える(App.tsx)。ほかの文字の大きさは rem でこれに合わせる */
+html {
+  font-size: 16px;
+  /* ダブルタップでの拡大を止める */
+  touch-action: manipulation;
 }
 
 body {
@@ -61,7 +74,7 @@ textarea {
 input,
 select,
 textarea {
-  font-size: 16px;
+  font-size: max(16px, 1rem);
 }
 
 .app {
@@ -98,7 +111,7 @@ textarea {
   gap: 2px;
   border: 0;
   background: none;
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-sub);
 }
 
@@ -108,7 +121,7 @@ textarea {
 }
 
 .tabbar-icon {
-  font-size: 22px;
+  font-size: 1.375rem;
   line-height: 1;
 }
 
@@ -143,14 +156,14 @@ textarea {
 }
 
 .screen-title {
-  font-size: 24px;
+  font-size: 1.5rem;
   margin: 0;
   /* 1行に収まらない長い題名(「9/28(月)の献立を作り直す」)だけ折り返す */
   overflow-wrap: anywhere;
 }
 
 .section-title {
-  font-size: 16px;
+  font-size: 1rem;
   margin: 24px 0 8px;
   color: var(--text-sub);
 }
@@ -189,7 +202,7 @@ textarea {
 .btn-small {
   min-height: 36px;
   padding: 0 12px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .btn-block {
@@ -268,7 +281,7 @@ button.list-item {
 }
 
 .list-sub {
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-sub);
   margin-top: 2px;
 }
@@ -321,13 +334,13 @@ button.list-item {
 }
 
 .field-label {
-  font-size: 14px;
+  font-size: 0.875rem;
   font-weight: 600;
   color: var(--text-sub);
 }
 
 .field-hint {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-sub);
 }
 
@@ -392,7 +405,7 @@ button.list-item {
   background: var(--surface);
   border: 1px solid var(--danger);
   border-radius: 10px;
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 /* ── 選択ボタン(1つ選ぶ・複数選ぶ) ── */
@@ -408,7 +421,7 @@ button.list-item {
   border-radius: 999px;
   border: 1px solid var(--line);
   background: var(--surface);
-  font-size: 14px;
+  font-size: 0.875rem;
   cursor: pointer;
 }
 
@@ -423,25 +436,34 @@ button.list-item {
   content: ' ×';
 }
 
-/* ── 下から出る画面 ── */
+/* ── 真ん中に出る枠 ── */
+/*
+ * 後ろの暗い幕は、タッチをそのまま後ろの画面に通す(pointer-events: none)。
+ * そのため、枠を開いたまま後ろの画面をスクロールして確かめられる。後ろのボタンは押せない(Sheet.tsx で止める)
+ */
 .sheet-backdrop {
   position: fixed;
   inset: 0;
-  background: rgb(0 0 0 / 0.35);
+  background: rgb(0 0 0 / 0.22);
   z-index: 20;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: center;
+  padding: calc(env(safe-area-inset-top) + 16px) 12px calc(env(safe-area-inset-bottom) + 16px);
+  pointer-events: none;
 }
 
 .sheet {
+  pointer-events: auto;
   width: 100%;
-  max-width: 640px;
-  max-height: calc(100dvh - env(safe-area-inset-top) - 12px);
+  max-width: 560px;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   background: var(--bg);
-  border-radius: 16px 16px 0 0;
+  border-radius: 16px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 0.25);
+  overflow: hidden;
 }
 
 /* 見出しは2段:上の段にボタン、下の段に題名(題名が長くてもボタンが押しつぶされないように) */
@@ -474,7 +496,7 @@ button.list-item {
 
 .sheet-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 1.125rem;
   line-height: 1.4;
   /* 長い題名は横幅いっぱいで自然に折り返す(区切りのない長い英数字も) */
   overflow-wrap: anywhere;
@@ -482,8 +504,10 @@ button.list-item {
 
 .sheet-body {
   overflow-y: auto;
-  padding: 16px 16px calc(env(safe-area-inset-bottom) + 24px);
+  padding: 16px 16px 24px;
   -webkit-overflow-scrolling: touch;
+  /* 枠の中の端までスクロールしても、後ろの画面は一緒に動かさない */
+  overscroll-behavior: contain;
 }
 
 /* ── レシピ ── */
@@ -494,7 +518,7 @@ button.list-item {
 }
 
 .tag {
-  font-size: 12px;
+  font-size: 0.75rem;
   padding: 2px 8px;
   border-radius: 999px;
   background: var(--surface-2);
@@ -536,7 +560,7 @@ button.list-item {
 
 .muted {
   color: var(--text-sub);
-  font-size: 14px;
+  font-size: 0.875rem;
 }
 
 .check-row {
@@ -596,7 +620,7 @@ button.list-item {
 }
 
 .day-title {
-  font-size: 17px;
+  font-size: 1.0625rem;
   font-weight: 700;
 }
 
@@ -617,7 +641,7 @@ button.list-item {
 }
 
 .dish-course {
-  font-size: 12px;
+  font-size: 0.75rem;
   color: var(--text-sub);
 }
 
@@ -631,7 +655,7 @@ button.list-item {
 }
 
 .note {
-  font-size: 13px;
+  font-size: 0.8125rem;
   padding: 6px 10px;
   border-radius: 8px;
   background: var(--accent-soft);
@@ -645,7 +669,7 @@ button.list-item {
 .balance {
   display: flex;
   gap: 10px;
-  font-size: 13px;
+  font-size: 0.8125rem;
   color: var(--text-sub);
   align-items: center;
 }
@@ -672,7 +696,7 @@ button.list-item {
   height: 30px;
   padding: 0;
   border-radius: 50%;
-  font-size: 15px;
+  font-size: 0.9375rem;
 }
 
 .help-content {
@@ -699,4 +723,46 @@ button.list-item {
 
 .faq dd {
   margin: 4px 0 0;
+}
+
+/* ── 在庫の検索・並び順・ジャンルの見出し ── */
+.stock-tools {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.stock-genre {
+  font-size: 0.875rem;
+  margin: 16px 0 6px;
+  color: var(--text-sub);
+}
+
+/* ── 左スワイプで削除 ── */
+.swipe-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.swipe-delete {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 88px;
+  border: 0;
+  background: var(--danger);
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.swipe-content {
+  position: relative;
+  background: var(--surface);
+  /* 縦の動きはスクロールにし、横の動きだけをスワイプとして受け取る */
+  touch-action: pan-y;
+}
+
+.list > li:last-child .swipe-content > .list-item {
+  border-bottom: 0;
 }

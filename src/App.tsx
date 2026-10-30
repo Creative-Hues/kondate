@@ -1,4 +1,8 @@
-import { useState } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { useEffect, useState } from 'react';
+import { applyFontSize } from './components/fontSize';
+import { UpdatePrompt } from './components/UpdatePrompt';
+import { db } from './db/db';
 import { MemberScreen } from './screens/MemberScreen';
 import { PlanScreen } from './screens/PlanScreen';
 import { RecipeScreen } from './screens/RecipeScreen';
@@ -17,6 +21,12 @@ const TABS: { id: Tab; label: string; icon: string }[] = [
 
 export function App() {
   const [tab, setTab] = useState<Tab>('plan');
+  const fontSize = useLiveQuery(async () => (await db.household.get('household'))?.fontSize ?? '中', []);
+
+  // 設定の「文字の大きさ」を画面全体に当てる
+  useEffect(() => {
+    if (fontSize) applyFontSize(fontSize);
+  }, [fontSize]);
 
   return (
     <div className="app">
@@ -43,6 +53,7 @@ export function App() {
           </button>
         ))}
       </nav>
+      <UpdatePrompt />
     </div>
   );
 }

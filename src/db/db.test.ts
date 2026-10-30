@@ -7,7 +7,7 @@ import { defaultHouseholdPrefs } from '../data/household';
 import { INITIAL_RECIPES } from '../data/recipes';
 import { parseBackup, serializeBackup } from '../logic/backup';
 import { sequentialIds } from '../logic/id';
-import { KondateDB } from './db';
+import { CURRENT_DB_VERSION, KondateDB } from './db';
 import { addStockToDb, removeStockFromDb, setStockAmountInDb, tidyUpStocksInDb } from './stockRepo';
 
 let n = 0;
@@ -239,6 +239,48 @@ describe('版6からの移行', () => {
     expect((await db.foods.get('user_2'))?.genre).toBe('調味料');
     expect(await db.household.get('household')).toMatchObject({ shoppingLimitPerMeal: 3, showShelfLife: true, fontSize: '中' });
     expect(await db.stocks.get('egg')).toEqual({ foodId: 'egg', amount: 6, addedDate: '2026-09-20' });
+  });
+});
+
+describe('更新の前のバックアップ', () => {
+  it('古い版のデータベースを、形を直さずにそのまま読める。版も調べられる', async () => {
+    const { readRawTables, storedDbVersion } = await import('./updateCheck');
+    const name = `test-${++n}`;
+    const old = new Dexie(name);
+    old.version(6).stores({
+      foods: 'id, name, kind',
+      stocks: 'foodId',
+      pantry: 'foodId',
+      members: 'id, kind',
+      household: 'id',
+      recipes: 'id, course, source',
+      mealSets: 'id, startDate',
+      stockMoves: 'id, at, foodId',
+      feedbacks: 'id, at',
+      planDrafts: 'id',
+      ignoredWords: 'word',
+    });
+    await old.table('stocks').add({ foodId: 'egg', amount: 6, addedDate: '2026-09-20' });
+    await old.table('foods').add({ id: 'user_1', name: 'みょうが' });
+    old.close();
+
+    expect(await storedDbVersion(name)).toBe(6);
+    expect(await storedDbVersion('まだないデータベース')).toBeNull();
+    const tables = await readRawTables(name);
+    expect(tables.stocks).toEqual([{ foodId: 'egg', amount: 6, addedDate: '2026-09-20' }]);
+    expect(tables.foods).toEqual([{ id: 'user_1', name: 'みょうが' }]);
+    // 下書きは書き出しの対象外
+    expect(tables.planDrafts).toBeUndefined();
+    // 読んだだけなので、版は変わらない
+    expect(await storedDbVersion(name)).toBe(6);
+  });
+
+  it('CURRENT_DB_VERSION は、データベースのいちばん新しい版と同じ', async () => {
+    const db = freshDb();
+    await db.open();
+    expect(db.verno).toBe(CURRENT_DB_VERSION);
+    const { storedDbVersion } = await import('./updateCheck');
+    expect(await storedDbVersion(db.name)).toBe(CURRENT_DB_VERSION);
   });
 });
 

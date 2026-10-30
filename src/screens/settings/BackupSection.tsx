@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { db } from '../../db/db';
 import type { AllData } from '../../db/types';
 import { backupFileName, countData, parseBackup, serializeBackup } from '../../logic/backup';
+import { saveJsonFile } from '../../components/saveFile';
 
 const TABLE_LABELS: Record<keyof AllData, string> = {
   foods: '食材辞書',
@@ -15,22 +16,6 @@ const TABLE_LABELS: Record<keyof AllData, string> = {
   feedbacks: '評価',
   ignoredWords: '読まない言葉',
 };
-
-/** タッチ操作の端末(iPhone など)では共有シートで保存する */
-function shouldUseShareSheet(file: File): boolean {
-  return navigator.maxTouchPoints > 0 && typeof navigator.canShare === 'function' && navigator.canShare({ files: [file] });
-}
-
-function downloadFile(file: File) {
-  const url = URL.createObjectURL(file);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = file.name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
 
 type Pending = { data: AllData; exportedAt: string; fileName: string };
 
@@ -46,17 +31,11 @@ export function BackupSection() {
     setError(null);
     const now = new Date();
     const text = serializeBackup(await db.readAll(), now);
-    const file = new File([text], backupFileName(now), { type: 'application/json' });
+    const fileName = backupFileName(now);
     try {
-      if (shouldUseShareSheet(file)) {
-        await navigator.share({ files: [file] });
-      } else {
-        downloadFile(file);
-      }
-      setMessage(`「${file.name}」を書き出しました`);
-    } catch (e) {
       // 共有シートを閉じただけのときは何もしない
-      if (e instanceof DOMException && e.name === 'AbortError') return;
+      if ((await saveJsonFile(text, fileName)) === 'saved') setMessage(`「${fileName}」を書き出しました`);
+    } catch {
       setError('書き出しに失敗しました');
     }
   };
