@@ -16,6 +16,11 @@ export default defineConfig({
     VitePWA({
       // 新しい版が届いても自動では切り替えず、お知らせを出す(書き出しを済ませてから更新する。UpdatePrompt.tsx)
       registerType: 'prompt',
+      // 【この版だけの切り替え用】前の版のアプリは「お知らせ」の仕組みを持っていないため、新しい版を待たせたままにすると、
+      // いつまでも更新されない。そこでこの版だけは、届いたらすぐに切り替える(次に開いたときに新しい版になる)。
+      // データの形が変わる更新は、開いたときに UpdateGate.tsx が先にバックアップを取ってもらうので、データは守られる。
+      // 次に公開するときは、この1行を消して「お知らせ」に戻す(SPEC.md 3章「保存とバックアップ」を参照)
+      workbox: { skipWaiting: true },
       includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png'],
       manifest: {
         name: APP_NAME,
