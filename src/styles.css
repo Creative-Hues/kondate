@@ -111,7 +111,9 @@ textarea {
   gap: 2px;
   border: 0;
   background: none;
-  font-size: 0.75rem;
+  /* 下のタブは決まった大きさのまま(文字の大きさの設定で変えると、5つが入りきらないため) */
+  font-size: 12px;
+  white-space: nowrap;
   color: var(--text-sub);
 }
 
@@ -121,7 +123,7 @@ textarea {
 }
 
 .tabbar-icon {
-  font-size: 1.375rem;
+  font-size: 22px;
   line-height: 1;
 }
 
@@ -732,10 +734,38 @@ button.list-item {
   margin-bottom: 12px;
 }
 
+/* 並び順のボタンは、幅を分け合って1行に並べる(入りきらない大きさの文字のときだけ折り返す) */
+.stock-tools .segmented .chip {
+  flex: 1 1 auto;
+  padding: 0 8px;
+  white-space: nowrap;
+}
+
+/* 在庫の行:量は「(約○g)」の前で折り返せるようにし、名前の欄を押しつぶさない */
+.stock-amount {
+  white-space: normal;
+  max-width: 45%;
+}
+
+/* 「目安を過ぎています」の印は、折り返さずに追加日の下の行に出す */
+.stock-past {
+  margin-top: 4px;
+}
+
+.stock-past .tag {
+  white-space: nowrap;
+}
+
 .stock-genre {
   font-size: 0.875rem;
   margin: 16px 0 6px;
   color: var(--text-sub);
+}
+
+/* ── 確定後の再編集の確認 ── */
+.edit-change {
+  display: grid;
+  gap: 2px;
 }
 
 /* ── 左スワイプで削除 ── */

@@ -175,12 +175,15 @@ export function StockScreen() {
                     <span className="group-dot" data-group={food.foodGroup ?? ''} aria-hidden="true" />
                     <span className="list-main">
                       <span className="list-title">{food.name}</span>
-                      <div className="list-sub">
-                        追加日 {formatShortDate(stock.addedDate)}
-                        {past && <span className="tag" style={{ marginLeft: 6 }}>⚠ 目安を過ぎています</span>}
-                      </div>
+                      <div className="list-sub">追加日 {formatShortDate(stock.addedDate)}</div>
+                      {past && (
+                        <div className="stock-past">
+                          <span className="tag">⚠ 目安を過ぎています</span>
+                        </div>
+                      )}
                     </span>
-                    <span className="list-end">{formatStockAmount(stock.amount, food)}</span>
+                    {/* 「1/2個(約1000g)」の「(」の前で折り返せるようにする */}
+                    <span className="list-end stock-amount">{formatStockAmount(stock.amount, food).replace('(', '\u200b(')}</span>
                   </>
                 );
                 return (

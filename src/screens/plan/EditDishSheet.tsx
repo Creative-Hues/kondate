@@ -26,7 +26,7 @@ export function EditDishSheet({ before, after, recipesById, busy, onNext, onAppl
           {changes.map((s) => (
             <li key={s.key} className="list-item">
               <span className="dish-course">{s.course}</span>
-              <span className="list-main">
+              <span className="list-main edit-change">
                 <span className="list-sub">{name(before[s.key])}</span>
                 <span className="list-title">→ {name(after[s.key])}</span>
               </span>
@@ -38,16 +38,15 @@ export function EditDishSheet({ before, after, recipesById, busy, onNext, onAppl
         <p className="muted" style={{ margin: 0 }}>
           前の料理で使う予定だった食材を在庫に戻してから、新しい料理の分を在庫から減らします。足りない食材は買い足しリストに入ります。
         </p>
-        <div className="btn-row">
-          {onNext && (
-            <button type="button" className="btn" disabled={busy} onClick={onNext}>
-              ほかの候補
-            </button>
-          )}
-          <button type="button" className="btn btn-primary" disabled={busy} onClick={onApply}>
-            この内容で変える
+        {/* ボタンの文字が折り返さないよう、縦に並べる */}
+        <button type="button" className="btn btn-primary btn-block" disabled={busy} onClick={onApply}>
+          この内容で変える
+        </button>
+        {onNext && (
+          <button type="button" className="btn btn-block" disabled={busy} onClick={onNext}>
+            ほかの候補
           </button>
-        </div>
+        )}
       </div>
     </Sheet>
   );
