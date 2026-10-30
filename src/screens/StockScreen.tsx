@@ -182,8 +182,7 @@ export function StockScreen() {
                         </div>
                       )}
                     </span>
-                    {/* 「1/2個(約1000g)」の「(」の前で折り返せるようにする */}
-                    <span className="list-end stock-amount">{formatStockAmount(stock.amount, food).replace('(', '\u200b(')}</span>
+                    <StockAmount text={formatStockAmount(stock.amount, food)} />
                   </>
                 );
                 return (
@@ -275,6 +274,19 @@ export function StockScreen() {
         </Sheet>
       )}
     </>
+  );
+}
+
+/** 在庫の量。「1/2個(約1000g)」は「(」の前だけで折り返す(「約」と数字の間などでは折り返さない) */
+function StockAmount({ text }: { text: string }) {
+  const i = text.indexOf('(');
+  if (i < 0) return <span className="list-end stock-amount">{text}</span>;
+  return (
+    <span className="list-end stock-amount">
+      <span className="nowrap">{text.slice(0, i)}</span>
+      <wbr />
+      <span className="nowrap">{text.slice(i)}</span>
+    </span>
   );
 }
 

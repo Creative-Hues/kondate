@@ -747,6 +747,10 @@ button.list-item {
   max-width: 45%;
 }
 
+.nowrap {
+  white-space: nowrap;
+}
+
 /* 「目安を過ぎています」の印は、折り返さずに追加日の下の行に出す */
 .stock-past {
   margin-top: 4px;
